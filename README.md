@@ -22,6 +22,18 @@ python3 main.py
 
 > You need a SteamGridDB API key. You can get one [here](https://www.steamgriddb.com/profile/settings/api).
 
+## Last Update ❕❕
+
+I've added some modifications for Steam Deck users like:
+
+    * Fixed covers/banners file paths for flatpak Lutris (installed via Discover app)
+    * Banners search for 920x430 and 460x215 resolutions.
+    * Cover images are being resized to look good in Game Mode.
+
+Total thanks to [Deytron](https://github.com/Deytron) who is the original author of the script, I just added a few improvements.
+
+Victor
+
 ## Screenshots
 
 Your library will go from this:
