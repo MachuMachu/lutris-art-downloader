@@ -8,7 +8,6 @@ user = ''
 dbpath = ''
 dim = ''
 auth = ''
-covpath = ''
 
 # Main function
 def main():
@@ -22,8 +21,8 @@ def main():
     if auth == '':
         SetAPIKey()
     co = DBConnect()
-    GetGamesList(co)
     CleanNotInstalledGames(co)
+    GetGamesList(co)
 
 ####### FUNCTIONS
 
@@ -40,14 +39,20 @@ def CleanNotInstalledGames(co):
 
 #Delete covers/banners for not installed games
 def DeleteImages(listgames):
+    count=0
     bannpath = '/home/' + user + '/.var/app/net.lutris.Lutris/cache/lutris/banners/'
     covpath = '/home/' + user + '/.var/app/net.lutris.Lutris/cache/lutris/coverart/'
+    print("Deleting Banners/Covers of uninstalled apps")
     for path in [bannpath, covpath]:
         for filename in os.listdir(path):
             if filename.lower() not in listgames and os.path.isfile(os.path.join(path, filename)):
                 if filename.lower().endswith('.jpg'):
-                    os.remove(os.path.join(path, filename))
-
+                    try:
+                        os.remove(os.path.join(path, filename))
+                        count += 1
+                    except:
+                        print("Something went wrong to try remove " + filename)
+    print(f"{count} files have been deleted")
 
 def GetUser():
     try:
@@ -56,22 +61,41 @@ def GetUser():
         print("Could not get session username")
         exit(1)
 
+def SetPathAndDimensions(opt):
+    global listdimensions, bannpath, covpath
+    bannpath = ''
+    covpath = ''
+    listdimensions = []
+    dim=''
+    match opt:
+        case "All (Banners/Covers)":
+                bannpath = '/home/' + user + '/.var/app/net.lutris.Lutris/cache/lutris/banners/'
+                covpath = '/home/' + user + '/.var/app/net.lutris.Lutris/cache/lutris/coverart/'
+                dim = [['600x900'],['920x430','460x215']]
+                listdimensions.append(dim)
+                return dim
+        case "Banner (920x430/460x215)":
+                covpath = '/home/' + user + '/.var/app/net.lutris.Lutris/cache/lutris/banners/'
+                dim = ['920x430','460x215']
+                return dim
+        case "Vertical (600x900)":
+                covpath = '/home/' + user + '/.var/app/net.lutris.Lutris/cache/lutris/coverart/'
+                dim = ['600x900']
+                return dim
+        case _:
+                return dim
+
+
 def GetCoverType():
-    global covpath
     questions = [
     inquirer.List('type',
                     message="Would you like to download Steam banners or Steam vertical covers?",
-                    choices=['Banner (920x430/460x215)', 'Vertical (600x900)'],
+                    choices=['All (Banners/Covers)','Banner (920x430/460x215)', 'Vertical (600x900)'],
                 ),
     ]
     ans = inquirer.prompt(questions)["type"]
     print('Cover type set to ' + ans + '\n')
-    if ans == 'Banner (920x430/460x215)':
-        covpath = '/home/' + user + '/.var/app/net.lutris.Lutris/cache/lutris/banners/'
-        dim = ['920x430','460x215']
-    else:
-        covpath = '/home/' + user + '/.var/app/net.lutris.Lutris/cache/lutris/coverart/'
-        dim = ['600x900']
+    dim = SetPathAndDimensions(ans)
     return dim
 
 def SaveAPIKey(key):
@@ -123,7 +147,7 @@ def SearchGame(game):
         return id
 
 # Download cover by searching for the game via its name, then via its SteamGriDB's ID
-def DownloadCover(name, dimensions):
+def DownloadCover(name, dimensions, path):
     url = ''
     gameid = SearchGame(name)
     print("Searching cover for " + name.replace('-', ' ').title())
@@ -140,25 +164,37 @@ def DownloadCover(name, dimensions):
             print("Could not find a cover for game " + name)
             return
     r = requests.get(url)
-    with open(covpath + name + '.jpg', 'wb') as f:
+    with open(path + name + '.jpg', 'wb') as f:
         f.write(r.content)
     # Redimension for Steam Deck users
     if '600x900' in dim:
-        im = Image.open(covpath + name + '.jpg')
+        im = Image.open(path + name + '.jpg')
         im = im.resize((264, 352), Image.LANCZOS)
-        im.save(covpath + name + '.jpg')
+        im.save(path + name + '.jpg')
 
 # Get all games and for each game, check if it already has a cover
 def GetGamesList(co):
     c = co.execute('SELECT slug FROM games WHERE installed = "1"')
     games = c.fetchall()
     for entry in games:
+        path = covpath
         title = entry[0]
-        if not os.path.isfile(covpath + title + '.jpg'):
-            # If not, download it
-            DownloadCover(title, dim)
+        if bannpath and covpath:
+                for elem in dim:
+                    if not os.path.isfile(path + title + '.jpg'):
+                        DownloadCover(title, elem, path)
+                        print("======================================================")
+                        print("")
+                        path = bannpath
+
         else:
-            print("Cover for " + title.replace('-', ' ').title() + " already exists")
+            if not os.path.isfile(covpath + title + '.jpg'):
+                # If not, download it
+                DownloadCover(title, dim, path)
+                print("======================================================")
+                print("")
+            else:
+                print("Cover for " + title.replace('-', ' ').title() + " already exists")
     print('All done ! Restart Lutris for the changes to take effect')
 
 
