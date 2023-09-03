@@ -26,11 +26,11 @@ python3 main.py
 
 I've added some modifications for Steam Deck users like:
 
-    * Fixed covers/banners file paths for flatpak Lutris (installed via Discover app)
-    * Banners search for 920x430 and 460x215 resolutions.
-    * Cover images are being resized to look good in Game Mode.
-    * New option for download all (Banners & Covers)
-    * In order to maintain an optimal storage usage, I've added a process for remove images of uninstalled apps
+- Fixed covers/banners file paths for flatpak Lutris (installed via Discover app)
+- Banners search for 920x430 and 460x215 resolutions.
+- Cover images are being resized to look good in Game Mode.
+- New option for download all (Banners & Covers)
+- In order to maintain an optimal storage usage, I've added a process for remove images of uninstalled apps
 
 Total thanks to [Deytron](https://github.com/Deytron) who is the original author of the script, I just added a few improvements.
 
