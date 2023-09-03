@@ -1,6 +1,7 @@
 # Import necessary modules
 import requests, sqlite3, os, inquirer, base64
 from os import remove, path
+from PIL import Image
 
 # Vars
 user = ''
@@ -60,17 +61,17 @@ def GetCoverType():
     questions = [
     inquirer.List('type',
                     message="Would you like to download Steam banners or Steam vertical covers?",
-                    choices=['Banner (460x215)', 'Vertical (600x900)'],
+                    choices=['Banner (920x430/460x215)', 'Vertical (600x900)'],
                 ),
     ]
     ans = inquirer.prompt(questions)["type"]
     print('Cover type set to ' + ans + '\n')
-    if ans == 'Banner (460x215)':
+    if ans == 'Banner (920x430/460x215)':
         covpath = '/home/' + user + '/.var/app/net.lutris.Lutris/cache/lutris/banners/'
-        dim = '460x215'
+        dim = ['920x430','460x215']
     else:
         covpath = '/home/' + user + '/.var/app/net.lutris.Lutris/cache/lutris/coverart/'
-        dim = '600x900'
+        dim = ['600x900']
     return dim
 
 def SaveAPIKey(key):
@@ -122,18 +123,30 @@ def SearchGame(game):
         return id
 
 # Download cover by searching for the game via its name, then via its SteamGriDB's ID
-def DownloadCover(name):
+def DownloadCover(name, dimensions):
+    url = ''
     gameid = SearchGame(name)
-    print("Downloading cover for " + name.replace('-', ' ').title())
-    grids = requests.get('https://www.steamgriddb.com/api/v2/grids/game/' + str(gameid) + '?dimensions=' + dim, headers=auth).json()
-    try:
-        url = grids["data"][0]["url"]
-    except:
-        print("Could not find a cover for game " + name)
-        return
+    print("Searching cover for " + name.replace('-', ' ').title())
+    # Try download covers/banners in multiple dimensions
+    for dim in dimensions:
+        if not url:
+            grids = requests.get('https://www.steamgriddb.com/api/v2/grids/game/' + str(gameid) + '?dimensions=' + dim, headers=auth).json()
+        # Make sure if data request is not null)
+            if len(grids["data"]) > 0:
+                print("Downloading cover for "+ name.replace('-', ' ').title() + ' with ' + dim + ' resolution')
+                url = grids["data"][0]["url"]
+        # If we can't find any horizonal dimensions ('920x430','460x215')
+        if dim == dimensions[-1] and not url:
+            print("Could not find a cover for game " + name)
+            return
     r = requests.get(url)
     with open(covpath + name + '.jpg', 'wb') as f:
         f.write(r.content)
+    # Redimension for Steam Deck users
+    if '600x900' in dim:
+        im = Image.open(covpath + name + '.jpg')
+        im = im.resize((264, 352), Image.LANCZOS)
+        im.save(covpath + name + '.jpg')
 
 # Get all games and for each game, check if it already has a cover
 def GetGamesList(co):
@@ -143,10 +156,12 @@ def GetGamesList(co):
         title = entry[0]
         if not os.path.isfile(covpath + title + '.jpg'):
             # If not, download it
-            DownloadCover(title)
+            DownloadCover(title, dim)
         else:
             print("Cover for " + title.replace('-', ' ').title() + " already exists")
     print('All done ! Restart Lutris for the changes to take effect')
+
+
 
 if __name__ == '__main__':
     main()
