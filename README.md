@@ -21,6 +21,7 @@ python3 main.py
 ```
 
 > You need a SteamGridDB API key. You can get one [here](https://www.steamgriddb.com/profile/settings/api).
+> If you are a Steam Deck user, make sure that you have installed pip command
 
 ## Last Update ❕❕
 
