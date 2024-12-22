@@ -80,8 +80,8 @@ def GetCoverType():
     questions = [
     inquirer.List('type',
                     message="Would you like to download Steam banners or Steam vertical covers?",
-                    choices=['Banner (460x215)', 'Vertical (600x900)', 'Both',
-                            'Delete + Both + Random'
+                    choices=['Banner (460x215)', 'Vertical (600x900)', 'Both (600x900 920x430)',
+                            'I\'m Feeling lucky!'
                              ],
                 ),
     ]
@@ -93,14 +93,14 @@ def GetCoverType():
     elif ans == 'Vertical (600x900)':
         covpath = '/home/' + user + '/.cache/lutris/coverart/'
         dim = '600x900'
-    elif ans == 'Both' :
+    elif ans == 'Both (600x900 920x430)' :
         covpath = '/home/' + user + '/.cache/lutris/coverart/'
         bannpath = '/home/' + user + '/.cache/lutris/banners/'
-        dim = 'both';
+        dim = 'both'
     else :
         covpath = '/home/' + user + '/.cache/lutris/coverart/'
         bannpath = '/home/' + user + '/.cache/lutris/banners/'
-        dim = 'random';
+        dim = 'random'
     return dim
 
 def SaveAPIKey(key):
@@ -159,39 +159,44 @@ def DownloadCover(name):
         gameid = SearchGame(name)
         if dim == 'random':
             rand = randint(0,20)
+            dice = randint(0,5)
             dim1 = '920x430'
             dim1ALT = '460x215'
             dim2 = '600x900'
             r = rand
-            # r = 9
             while True and r>=0:
                 try:
-                    print("Downloading banner for " + name.replace('-', ' ').title())
-                    print(r)
+                    if r != rand:
+                        print("Retrying banner for " + name.replace('-', ' ').title())
+                    else:
+                        print("Downloading banner for " + name.replace('-', ' ').title())
                     grid1 = requests.get('https://www.steamgriddb.com/api/v2/grids/game/' + str(gameid) + '?dimensions=' + dim1, headers=auth).json()
                     url1 = grid1["data"][r]["url"]
-                    print(url1)
-                    break;
+                    print("%s %s | %s" % (chr(0x2680+dice), r, url1.split('/')[-1]))
+                    break
                 except:
                     r = randint(0,r)
                     print("Could not find a banner for game " + name)
-            r=9
+                    print(traceback.format_exc())
+            r=rand
             while r>=0:
                 try:
-                    print("Downloading cover for " + name.replace('-', ' ').title())
-                    print(r)
+                    if r != rand:
+                        print("Retrying cover for " + name.replace('-', ' ').title())
+                    else:
+                        print("Downloading cover for " + name.replace('-', ' ').title())
                     grid2 = requests.get('https://www.steamgriddb.com/api/v2/grids/game/' + str(gameid) + '?dimensions=' + dim2, headers=auth).json()
                     url2 = grid2["data"][r]["url"]
-                    print(url2)
-                    break;
+                    print("%s %s | %s" % (chr(0x2680+dice), r, url2.split('/')[-1]))
+                    break
                 except:
                     r = randint(0,r)
                     print("Could not find a cover for game " + name)
+                    print(traceback.format_exc())
             r1 = requests.get(url1)
             r2 = requests.get(url2)
             ext1 = url1.split('.')[-1]
             ext2 = url2.split('.')[-1]
-            print(ext1)
             os.makedirs(covpath, exist_ok=True)
             os.makedirs(bannpath, exist_ok=True)
             with open(bannpath + name + '.'+ext1, 'wb') as f1:
