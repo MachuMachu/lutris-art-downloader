@@ -1,5 +1,5 @@
 # Import necessary modules
-import requests, sqlite3, os, inquirer, base64
+import requests, sqlite3, os, inquirer, base64, traceback
 
 # Vars
 user = ''
@@ -7,6 +7,7 @@ dbpath = ''
 dim = ''
 auth = ''
 covpath = ''
+bannpath = ''
 
 # Main function
 def main():
@@ -35,15 +36,35 @@ def CleanNotInstalledGames(co):
         listgames.append(title.lower())
     DeleteImages(listgames)
 
+def DeleteDirs():
+    covpath = '/home/' + user + '/.cache/lutris/coverart/'
+    bannpath = '/home/' + user + '/.cache/lutris/banners/'
+    for path in [covpath,bannpath]:
+        for file in os.listdir(path):
+            file_path = os.path.join(path, file)
+            try:
+                print("Deleting "+file_path)
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)
+            except Exception as e:
+                print('Exception occured deleting %s. Reason: %s' % (file_path, e))
+
 #Delete covers/banners for not installed games
 def DeleteImages(listgames):
-    bannpath = '/home/' + user + '/.cache/lutris/coverart/'
-    covpath = '/home/' + user + '/.cache/lutris/banners/'
+    covpath = '/home/' + user + '/.cache/lutris/coverart/'
+    bannpath = '/home/' + user + '/.cache/lutris/banners/'
+    os.makedirs(covpath, exist_ok=True)
+    os.makedirs(bannpath, exist_ok=True)
     for path in [bannpath, covpath]:
         for filename in os.listdir(path):
-            if filename.lower() not in listgames and os.path.isfile(os.path.join(path, filename)):
-                if filename.lower().endswith('.jpg'):
-                    os.remove(os.path.join(path, filename))
+            try:
+                if filename.lower() not in listgames and os.path.isfile(os.path.join(path, filename)):
+                    if filename.lower().endswith('.jpg'):
+                        os.remove(os.path.join(path, filename))
+            except:
+                print("An exception occured deleting "+filename)
 
 
 def GetUser():
@@ -55,10 +76,13 @@ def GetUser():
 
 def GetCoverType():
     global covpath
+    global bannpath
     questions = [
     inquirer.List('type',
                     message="Would you like to download Steam banners or Steam vertical covers?",
-                    choices=['Banner (460x215)', 'Vertical (600x900)'],
+                    choices=['Banner (460x215)', 'Vertical (600x900)', 'Both',
+                            'Delete + Both + Random'
+                             ],
                 ),
     ]
     ans = inquirer.prompt(questions)["type"]
@@ -66,9 +90,17 @@ def GetCoverType():
     if ans == 'Banner (460x215)':
         covpath = '/home/' + user + '/.cache/lutris/banners/'
         dim = '460x215'
-    else:
+    elif ans == 'Vertical (600x900)':
         covpath = '/home/' + user + '/.cache/lutris/coverart/'
         dim = '600x900'
+    elif ans == 'Both' :
+        covpath = '/home/' + user + '/.cache/lutris/coverart/'
+        bannpath = '/home/' + user + '/.cache/lutris/banners/'
+        dim = 'both';
+    else :
+        covpath = '/home/' + user + '/.cache/lutris/coverart/'
+        bannpath = '/home/' + user + '/.cache/lutris/banners/'
+        dim = 'random';
     return dim
 
 def SaveAPIKey(key):
@@ -111,6 +143,7 @@ def DBConnect():
 
 # Search for a game by name via Lutris database, then get the grid data
 def SearchGame(game):
+    print(game)
     res = requests.get('https://www.steamgriddb.com/api/v2/search/autocomplete/' + game, headers=auth).json()
     if len(res["data"]) == 0:
         print("Could not find a cover for game " + game)
@@ -121,25 +154,105 @@ def SearchGame(game):
 
 # Download cover by searching for the game via its name, then via its SteamGriDB's ID
 def DownloadCover(name):
-    gameid = SearchGame(name)
-    print("Downloading cover for " + name.replace('-', ' ').title())
-    grids = requests.get('https://www.steamgriddb.com/api/v2/grids/game/' + str(gameid) + '?dimensions=' + dim, headers=auth).json()
+    from random import randint as randint
     try:
-        url = grids["data"][0]["url"]
+        gameid = SearchGame(name)
+        if dim == 'random':
+            rand = randint(0,20)
+            dim1 = '920x430'
+            dim1ALT = '460x215'
+            dim2 = '600x900'
+            r = rand
+            # r = 9
+            while True and r>=0:
+                try:
+                    print("Downloading banner for " + name.replace('-', ' ').title())
+                    print(r)
+                    grid1 = requests.get('https://www.steamgriddb.com/api/v2/grids/game/' + str(gameid) + '?dimensions=' + dim1, headers=auth).json()
+                    url1 = grid1["data"][r]["url"]
+                    print(url1)
+                    break;
+                except:
+                    r = randint(0,r)
+                    print("Could not find a banner for game " + name)
+            r=9
+            while r>=0:
+                try:
+                    print("Downloading cover for " + name.replace('-', ' ').title())
+                    print(r)
+                    grid2 = requests.get('https://www.steamgriddb.com/api/v2/grids/game/' + str(gameid) + '?dimensions=' + dim2, headers=auth).json()
+                    url2 = grid2["data"][r]["url"]
+                    print(url2)
+                    break;
+                except:
+                    r = randint(0,r)
+                    print("Could not find a cover for game " + name)
+            r1 = requests.get(url1)
+            r2 = requests.get(url2)
+            ext1 = url1.split('.')[-1]
+            ext2 = url2.split('.')[-1]
+            print(ext1)
+            os.makedirs(covpath, exist_ok=True)
+            os.makedirs(bannpath, exist_ok=True)
+            with open(bannpath + name + '.'+ext1, 'wb') as f1:
+                f1.write(r1.content)
+            with open(covpath + name + '.'+ext2, 'wb') as f2:
+                f2.write(r2.content)
+        elif dim == 'both':
+            print("Downloading cover and banner for " + name.replace('-', ' ').title())
+            dim1 = '920x430'
+            dim1ALT = '460x215'
+            dim2 = '600x900'
+            while True:
+                try:
+                    grid1 = requests.get('https://www.steamgriddb.com/api/v2/grids/game/' + str(gameid) + '?dimensions=' + dim1, headers=auth).json()
+                    url1 = grid1["data"][0]["url"]
+                except:
+                    if dim1 == dim1ALT:
+                        break
+                    dim1 = dim1ALT
+                    print("Could not find a banner for game " + name)
+                    return
+                break
+            try:
+                grid2 = requests.get('https://www.steamgriddb.com/api/v2/grids/game/' + str(gameid) + '?dimensions=' + dim2, headers=auth).json()
+                url2 = grid2["data"][0]["url"]
+            except:
+                print("Could not find a cover for game " + name)
+                return
+            r1 = requests.get(url1)
+            r2 = requests.get(url2)
+            os.makedirs(covpath, exist_ok=True)
+            os.makedirs(bannpath, exist_ok=True)
+            with open(bannpath + name + '.jpg', 'wb') as f1:
+                f1.write(r1.content)
+            with open(covpath + name + '.jpg', 'wb') as f2:
+                f2.write(r2.content)
+        else :
+            print("Downloading cover for " + name.replace('-', ' ').title())
+            grids = requests.get('https://www.steamgriddb.com/api/v2/grids/game/' + str(gameid) + '?dimensions=' + dim, headers=auth).json()
+            try:
+                url = grids["data"][0]["url"]
+            except:
+                print("Could not find a cover for game " + name)
+                return
+            r = requests.get(url)
+            os.makedirs(covpath, exist_ok=True)
+            with open(covpath + name + '.jpg', 'wb') as f:
+                f.write(r.content)
     except:
-        print("Could not find a cover for game " + name)
-        return
-    r = requests.get(url)
-    with open(covpath + name + '.jpg', 'wb') as f:
-        f.write(r.content)
+        print("An exception occurred fetching "+name)
+        print(traceback.format_exc())
 
 # Get all games and for each game, check if it already has a cover
 def GetGamesList(co):
     c = co.execute('SELECT slug FROM games WHERE installed = "1"')
     games = c.fetchall()
+    if dim == 'random':
+        DeleteDirs()
     for entry in games:
         title = entry[0]
-        if not os.path.isfile(covpath + title + '.jpg'):
+        if dim == 'random' or not os.path.isfile(covpath + title + '.jpg'):
             # If not, download it
             DownloadCover(title)
         else:
